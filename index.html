@@ -733,7 +733,7 @@
         generateSlideImage(state.slides[i], i, W, H).then(blob => {
           if (blob) {
             state.previews[i] = blob;
-            const img = btn.closest('.flex').querySelector('img');
+            const img = btn.closest('.flex-col').querySelector('img');
             img.src = URL.createObjectURL(blob);
           }
           btn.textContent = '🔄 Recriar';
