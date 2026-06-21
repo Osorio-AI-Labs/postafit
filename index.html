@@ -52,7 +52,8 @@
     .tab-btn.active { background: rgba(249,115,22,0.15); border-color: #f97316; color: #fb923c; }
     .style-btn { transition: all 0.2s; }
     .style-btn.selected { border-color: #f97316; background: rgba(249,115,22,0.1); }
-    #loginScreen { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; }
+    #loginScreen { position: fixed; inset: 0; z-index: 9999; align-items: center; justify-content: center; }
+    #loginScreen:not(.hidden) { display: flex; }
     #loginScreen input { transition: all 0.2s; }
     #loginScreen input:focus { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249,115,22,0.2); }
     .shake { animation: shake 0.4s ease; }
@@ -63,6 +64,12 @@
   <!-- Login Screen -->
   <div id="loginScreen" class="hidden">
     <div class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+    
+    <!-- Marca d'água Osorio AI Labs no login -->
+    <div class="absolute bottom-4 left-4 opacity-20 pointer-events-none select-none z-[10000]">
+      <img src="osorio_logo.png" alt="Osorio AI Labs Logo" class="h-6 object-contain" />
+    </div>
+
     <div class="relative bg-[#0f172a] border border-[#1e293b] rounded-3xl p-8 w-[90%] max-w-sm text-center shadow-2xl">
       <div class="w-16 h-16 mx-auto mb-4 bg-brand-500 rounded-2xl flex items-center justify-center shadow-lg shadow-brand-500/30 rotate-3">
         <span class="text-white text-3xl font-black">PF</span>
@@ -220,6 +227,22 @@
     </footer>
   </div>
 
+  <!-- LGPD Consent Banner -->
+  <div id="lgpdBanner" class="fixed bottom-4 right-4 left-4 sm:left-auto sm:max-w-md bg-[#0f172a] border border-[#1e293b]/80 rounded-2xl p-4 shadow-2xl z-[9999] hidden flex-col gap-3">
+    <div class="flex items-start gap-2.5">
+      <span class="text-xl">🛡️</span>
+      <div>
+        <p class="text-white text-xs font-bold mb-1">Privacidade e Uso de Dados</p>
+        <p class="text-slate-400 text-[11px] leading-relaxed">
+          O PostaFit utiliza o armazenamento local do seu navegador (localStorage) para salvar suas configurações, preferências de slides e logotipo. Ao continuar, você concorda com este uso em conformidade com a LGPD.
+        </p>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2">
+      <button id="lgpdAcceptBtn" class="px-4 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all">Aceitar</button>
+    </div>
+  </div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     // ─── PROMPT LIBRARY ──────────────────────────────────────────
@@ -356,6 +379,7 @@
       setupLibraryDelegation();
       setupDailyBadge();
       bindGlobalEvents();
+      checkLgpdConsent();
     }
 
     function setupDailyBadge() {
@@ -945,9 +969,21 @@
         document.getElementById('loginScreen').classList.remove('hidden');
       }
     }
-    document.getElementById('loginBtn').addEventListener('click', function() {
+
+    async function hashSHA256(text) {
+      const msgBuffer = new TextEncoder().encode(text);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    document.getElementById('loginBtn').addEventListener('click', async function() {
       if (loginLocked) { showToast('Muitas tentativas. Aguarde 10s.', 'error'); return; }
-      if (document.getElementById('loginPassword').value === 'ClaudineiFi') {
+      const enteredPassword = document.getElementById('loginPassword').value;
+      const passwordHash = await hashSHA256(enteredPassword);
+      
+      // Hash SHA-256 da senha 'ClaudineiFi'
+      if (passwordHash === 'd552cf5bfbc015f4a7c06eb612de2f211516e8b4e724cc63428d022b79a8519f') {
         loginAttempts = 0;
         localStorage.setItem('postafit_auth', '1');
         document.getElementById('loginScreen').classList.add('hidden');
@@ -968,6 +1004,19 @@
     });
     document.getElementById('loginPassword').addEventListener('keydown', function(e) {
       if (e.key === 'Enter') document.getElementById('loginBtn').click();
+    });
+
+    // ─── LGPD CONSENT ──────────────────────────────────────────
+    function checkLgpdConsent() {
+      if (!localStorage.getItem('postafit_lgpd_consent')) {
+        document.getElementById('lgpdBanner').classList.remove('hidden');
+        document.getElementById('lgpdBanner').classList.add('flex');
+      }
+    }
+    document.getElementById('lgpdAcceptBtn').addEventListener('click', () => {
+      localStorage.setItem('postafit_lgpd_consent', '1');
+      document.getElementById('lgpdBanner').classList.add('hidden');
+      document.getElementById('lgpdBanner').classList.remove('flex');
     });
 
     // ─── START ──────────────────────────────────────────────────
