@@ -189,6 +189,19 @@
       <div id="styleGrid" class="grid grid-cols-3 sm:grid-cols-6 gap-2"></div>
     </section>
 
+    <!-- Formato do Post -->
+    <section class="bg-white/5 border border-white/10 rounded-3xl p-5 mb-4 fade-in">
+      <h2 class="text-white font-bold text-xs uppercase tracking-wider mb-3">📏 Formato do Post</h2>
+      <div class="flex gap-2">
+        <button id="formatFeedBtn" class="flex-1 py-3 border-2 rounded-xl text-center transition-all active:scale-95 text-xs font-bold border-white/10 bg-white/5 text-slate-400 hover:border-brand-500/50">
+          Feed / Carrossel (1:1)
+        </button>
+        <button id="formatStoryBtn" class="flex-1 py-3 border-2 rounded-xl text-center transition-all active:scale-95 text-xs font-bold border-white/10 bg-white/5 text-slate-400 hover:border-brand-500/50">
+          Stories (9:16)
+        </button>
+      </div>
+    </section>
+
     <!-- Slides Editor -->
     <section class="bg-white/5 border border-white/10 rounded-3xl p-5 mb-4 fade-in">
       <div class="flex items-center justify-between mb-3">
@@ -383,6 +396,7 @@
     const state = {
       logoDataURL: localStorage.getItem('postafit_logo') || '',
       imageStyle: localStorage.getItem('postafit_style') || 'gradient',
+      aspectRatio: localStorage.getItem('postafit_format') || '1:1',
       slides: [],
       previews: [],
       currentCategory: 'motivacional'
@@ -400,6 +414,7 @@
       renderDailyPrompt();
       renderLibrary();
       renderSlides();
+      setupFormatSelector();
       generateAllPreviews();
       setupTabs();
       setupCategories();
@@ -417,6 +432,40 @@
       const dia = hoje.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
       const dow = days[hoje.getDay()];
       $('#dailyBadge').textContent = `${dow} ${dia}`;
+    }
+
+    function setupFormatSelector() {
+      const feedBtn = document.getElementById('formatFeedBtn');
+      const storyBtn = document.getElementById('formatStoryBtn');
+
+      function updateButtons() {
+        const isFeed = state.aspectRatio === '1:1';
+        if (isFeed) {
+          feedBtn.className = 'flex-1 py-3 border-2 rounded-xl text-center transition-all active:scale-95 text-xs font-bold border-brand-500 bg-brand-500/10 text-brand-400';
+          storyBtn.className = 'flex-1 py-3 border-2 rounded-xl text-center transition-all active:scale-95 text-xs font-bold border-white/10 bg-white/5 text-slate-400 hover:border-brand-500/50';
+        } else {
+          storyBtn.className = 'flex-1 py-3 border-2 rounded-xl text-center transition-all active:scale-95 text-xs font-bold border-brand-500 bg-brand-500/10 text-brand-400';
+          feedBtn.className = 'flex-1 py-3 border-2 rounded-xl text-center transition-all active:scale-95 text-xs font-bold border-white/10 bg-white/5 text-slate-400 hover:border-brand-500/50';
+        }
+      }
+
+      feedBtn.addEventListener('click', () => {
+        state.aspectRatio = '1:1';
+        localStorage.setItem('postafit_format', '1:1');
+        updateButtons();
+        generateAllPreviews();
+        showToast('Formato Feed (1:1) selecionado!', 'success');
+      });
+
+      storyBtn.addEventListener('click', () => {
+        state.aspectRatio = '9:16';
+        localStorage.setItem('postafit_format', '9:16');
+        updateButtons();
+        generateAllPreviews();
+        showToast('Formato Stories (9:16) selecionado!', 'success');
+      });
+
+      updateButtons();
     }
 
     // ─── PROMPT CABECALHO ─────────────────────────────────────
@@ -719,7 +768,8 @@
       $('#loadingContainer').classList.remove('hidden');
       const loadText = $('#loadingText');
 
-      const W = 1080, H = 1080;
+      const W = 1080;
+      const H = state.aspectRatio === '1:1' ? 1080 : 1920;
       loadText.textContent = `Gerando ${state.slides.length} imagens...`;
       const results = await Promise.allSettled(
         state.slides.map((slide, i) => generateSlideImage(slide, i, W, H))
@@ -734,9 +784,10 @@
         if (!blob) return;
         const url = URL.createObjectURL(blob);
         const div = document.createElement('div');
+        const aspectClass = state.aspectRatio === '1:1' ? 'aspect-square' : 'aspect-[9/16]';
         div.className = 'flex flex-col gap-1.5 fade-in';
         div.innerHTML = `
-          <img src="${url}" class="preview-canvas w-full aspect-square object-cover" alt="Slide ${i + 1}" />
+          <img src="${url}" class="preview-canvas w-full ${aspectClass} object-cover" alt="Slide ${i + 1}" />
           <div class="flex gap-2">
             <button class="download-single flex-1 px-2 py-1.5 bg-white/10 hover:bg-brand-500 border border-white/20 rounded-xl text-white text-[10px] font-bold transition-all active:scale-95" data-index="${i}">💾 Slide ${i + 1}</button>
             <button class="regenerate-single flex-1 px-2 py-1.5 bg-brand-500/20 hover:bg-brand-500 border border-brand-500/30 rounded-xl text-brand-400 text-[10px] font-bold transition-all active:scale-95" data-index="${i}">🔄 Recriar</button>
@@ -757,7 +808,8 @@
       if (btn.classList.contains('download-single')) {
         if (state.previews[i]) downloadBlob(state.previews[i], `PostaFit_Slide_${i + 1}.png`);
       } else if (btn.classList.contains('regenerate-single')) {
-        const W = 1080, H = 1080;
+        const W = 1080;
+        const H = state.aspectRatio === '1:1' ? 1080 : 1920;
         btn.textContent = '⏳';
         generateSlideImage(state.slides[i], i, W, H).then(blob => {
           if (blob) {
@@ -803,29 +855,17 @@
       }
 
       const randomSeed = Math.floor(Math.random() * 1000000);
-      const fullPrompt = prompt + ', 1080x1080, high quality fitness background, dark moody lighting';
+      const fullPrompt = prompt + `, ${W}x${H}, high quality fitness background, dark moody lighting`;
 
       // 1) Pollinations (mais rápido, sem login)
       try {
-        const img = await loadImage(`https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1080&height=1080&nologo=true&seed=${randomSeed}`);
+        const img = await loadImage(`https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${W}&height=${H}&nologo=true&seed=${randomSeed}`);
         ctx.drawImage(img, 0, 0, W, H);
         ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, 0, W, H);
         return;
       } catch { /* fallback */ }
 
-      // 2) Puter.js (flux-schnell, precisa login 1x)
-      if (typeof puter !== 'undefined' && puter.ai) {
-        try {
-          const img = await puter.ai.txt2img(fullPrompt, { model: 'black-forest-labs/flux-schnell' });
-          if (img && img.complete && img.naturalWidth > 0) {
-            ctx.drawImage(img, 0, 0, W, H);
-            ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(0, 0, W, H);
-            return;
-          }
-        } catch (e) { /* fallback */ }
-      }
-
-      // 3) Canvas fallback
+      // 2) Canvas local (Canva nativo) - Alternativa imediata em caso de falha
       {
         const grad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W/1.5);
         grad.addColorStop(0, '#1e293b'); grad.addColorStop(1, '#020617');
