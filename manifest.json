@@ -1,0 +1,25 @@
+{
+  "name": "PostaFit — Gerador de Carrossel",
+  "short_name": "PostaFit",
+  "description": "Gere carrosséis profissionais para Instagram com a logo do seu cliente",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#f97316",
+  "background_color": "#020617",
+  "categories": ["business", "social", "photo"],
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logo-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

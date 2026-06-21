@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>PostaFit — Gerador de Carrossel</title>
+  <meta name="theme-color" content="#f97316" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="logo.png" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#fff7ed', 100: '#ffedd5', 200: '#fed7aa',
+              300: '#fdba74', 400: '#fb923c', 500: '#f97316',
+              600: '#ea580c', 700: '#c2410c', 800: '#9a3412',
+              900: '#7c2d12',
+            }
+          },
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #F8FAFC; }
+    .dark body, .dark { background: #020617; }
+    .dark-gradient { background: radial-gradient(circle at 50% 0%, #1e293b 0%, #0f172a 50%, #020617 100%); background-attachment: fixed; min-height: 100vh; }
+    .slide-card { transition: all 0.2s; }
+    .slide-card:hover { border-color: #f97316; }
+    .preview-canvas { border-radius: 12px; box-shadow: 0 20px 60px -15px rgba(0,0,0,0.3); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { width: 24px; height: 24px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 100; padding: 12px 24px; border-radius: 16px; font-weight: 600; font-size: 14px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); transition: all 0.3s; }
+    .prompt-card { cursor: pointer; transition: all 0.2s; }
+    .prompt-card:hover { border-color: #f97316; transform: translateY(-2px); }
+    .prompt-card.selected { border-color: #f97316; background: rgba(249,115,22,0.1); }
+    .tab-btn { transition: all 0.2s; }
+    .tab-btn.active { background: rgba(249,115,22,0.15); border-color: #f97316; color: #fb923c; }
+    .style-btn { transition: all 0.2s; }
+    .style-btn.selected { border-color: #f97316; background: rgba(249,115,22,0.1); }
+  </style>
+</head>
+<body class="dark dark-gradient">
+  <div id="app" class="max-w-4xl mx-auto px-4 py-6 pb-32">
+    <!-- Header -->
+    <header class="flex items-center justify-between mb-6 fade-in">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/30 rotate-3">
+          <span class="text-white text-lg font-black">PF</span>
+        </div>
+        <div>
+          <h1 class="text-2xl font-black text-white tracking-tighter">Posta<span class="text-brand-500">Fit</span></h1>
+          <p class="text-xs text-slate-500 font-semibold tracking-wider uppercase">Gerador de Carrossel</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="dailyBadge" class="px-3 py-1.5 bg-brand-500/20 border border-brand-500/30 rounded-xl text-brand-400 text-[10px] font-black uppercase tracking-wider"></span>
+        <button id="installBtn" class="hidden px-3 py-1.5 bg-white/10 border border-white/20 rounded-xl text-white text-[10px] font-bold hover:bg-white/20 transition-all uppercase tracking-wider">
+          📲 Instalar
+        </button>
+      </div>
+    </header>
+
+    <!-- Upload Logo -->
+    <section class="bg-white/5 border border-white/10 rounded-3xl p-5 mb-4 fade-in">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-white font-bold text-xs uppercase tracking-wider">Logo do Cliente</h2>
+        <span id="logoStatus" class="text-[10px] text-slate-500 font-semibold">Nenhuma</span>
+      </div>
+      <div class="flex flex-wrap gap-3 items-center">
+        <label class="cursor-pointer flex items-center gap-2 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold text-xs transition-all active:scale-95">
+          📁 Upload
+          <input type="file" id="logoInput" accept="image/*" class="hidden" />
+        </label>
+        <div id="logoPreview" class="hidden w-12 h-12 rounded-xl bg-white/10 border border-white/20 overflow-hidden flex-shrink-0">
+          <img id="logoPreviewImg" class="w-full h-full object-contain" alt="Logo" />
+        </div>
+        <button id="clearLogoBtn" class="hidden text-[10px] text-slate-500 hover:text-red-400 font-semibold">✕ Remover</button>
+      </div>
+    </section>
+
+    <!-- Prompt do Dia + Biblioteca -->
+    <section class="bg-white/5 border border-white/10 rounded-3xl p-5 mb-4 fade-in">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-white font-bold text-xs uppercase tracking-wider">
+          <span id="promptSectionTitle">📝 Prompt do Dia</span>
+        </h2>
+        <div class="flex gap-1">
+          <button data-prompt-tab="daily" class="tab-btn active px-3 py-1.5 rounded-xl border border-white/10 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Do Dia</button>
+          <button data-prompt-tab="library" class="tab-btn px-3 py-1.5 rounded-xl border border-white/10 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Biblioteca</button>
+          <button data-prompt-tab="custom" class="tab-btn px-3 py-1.5 rounded-xl border border-white/10 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Custom</button>
+        </div>
+      </div>
+
+      <!-- Daily Prompt -->
+      <div id="dailyTab" class="prompt-tab">
+        <div id="dailyPromptCard" class="p-4 rounded-2xl bg-gradient-to-br from-brand-500/20 to-brand-700/10 border border-brand-500/30 prompt-card selected">
+          <div class="flex items-start justify-between mb-2">
+            <span id="dailyPromptCategory" class="px-2 py-1 bg-brand-500 rounded-lg text-white text-[10px] font-black uppercase tracking-wider"></span>
+            <button id="refreshDailyBtn" class="text-slate-500 hover:text-brand-400 text-sm transition-colors" title="Novo prompt">🔄</button>
+          </div>
+          <p id="dailyPromptTitle" class="text-white font-bold text-sm mb-1"></p>
+          <p id="dailyPromptText" class="text-slate-400 text-xs leading-relaxed"></p>
+        </div>
+        <button id="useDailyPromptBtn" class="mt-3 w-full py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold text-xs transition-all active:scale-95 uppercase tracking-wider">
+          📥 Usar este Prompt no Carrossel
+        </button>
+      </div>
+
+      <!-- Library -->
+      <div id="libraryTab" class="prompt-tab hidden">
+        <div class="flex flex-wrap gap-1.5 mb-3">
+          <button data-cat="motivacional" class="cat-btn px-3 py-1.5 rounded-xl border border-white/10 text-[10px] font-bold text-slate-400 uppercase tracking-wider active">🔥 Motivacional</button>
+          <button data-cat="dica" class="cat-btn px-3 py-1.5 rounded-xl border border-white/10 text-[10px] font-bold text-slate-400 uppercase tracking-wider">⚡ Dica</button>
+          <button data-cat="resultado" class="cat-btn px-3 py-1.5 rounded-xl border border-white/10 text-[10px] font-bold text-slate-400 uppercase tracking-wider">📊 Resultado</button>
+          <button data-cat="nutricao" class="cat-btn px-3 py-1.5 rounded-xl border border-white/10 text-[10px] font-bold text-slate-400 uppercase tracking-wider">🥗 Nutrição</button>
+          <button data-cat="mentalidade" class="cat-btn px-3 py-1.5 rounded-xl border border-white/10 text-[10px] font-bold text-slate-400 uppercase tracking-wider">🧠 Mentalidade</button>
+          <button data-cat="exercicio" class="cat-btn px-3 py-1.5 rounded-xl border border-white/10 text-[10px] font-bold text-slate-400 uppercase tracking-wider">💪 Exercício</button>
+        </div>
+        <div id="libraryGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto no-scrollbar pr-1"></div>
+      </div>
+
+      <!-- Custom Prompt -->
+      <div id="customTab" class="prompt-tab hidden">
+        <div class="space-y-3">
+          <div>
+            <label class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1 block">Título do Prompt</label>
+            <input id="customPromptTitle" class="w-full px-4 py-2.5 bg-white/10 border border-white/20 rounded-xl text-white text-sm font-semibold focus:outline-none focus:border-brand-500 transition-colors" placeholder="Ex: Transformação Radical" />
+          </div>
+          <div>
+            <label class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1 block">Texto do Prompt</label>
+            <textarea id="customPromptText" rows="3" class="w-full px-4 py-2.5 bg-white/10 border border-white/20 rounded-xl text-white text-sm font-medium focus:outline-none focus:border-brand-500 transition-colors resize-none" placeholder="Digite sua mensagem para o carrossel..."></textarea>
+          </div>
+          <button id="useCustomPromptBtn" class="w-full py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold text-xs transition-all active:scale-95 uppercase tracking-wider">
+            📥 Usar Prompt Customizado
+          </button>
+          <p class="text-[10px] text-slate-600 text-center">Dica: misture textos de prompts diferentes copiando e colando!</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Image Style Selector -->
+    <section class="bg-white/5 border border-white/10 rounded-3xl p-5 mb-4 fade-in">
+      <h2 class="text-white font-bold text-xs uppercase tracking-wider mb-3">🎨 Estilo da Imagem</h2>
+      <div id="styleGrid" class="grid grid-cols-3 sm:grid-cols-6 gap-2"></div>
+    </section>
+
+    <!-- Slides Editor -->
+    <section class="bg-white/5 border border-white/10 rounded-3xl p-5 mb-4 fade-in">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-white font-bold text-xs uppercase tracking-wider">Slides <span id="slideCount" class="text-brand-500">(3)</span></h2>
+        <div class="flex gap-2">
+          <button id="fillSlidesBtn" class="px-3 py-1.5 bg-white/10 hover:bg-brand-500 text-white rounded-xl font-bold text-[10px] transition-all active:scale-95 uppercase tracking-wider border border-white/10">
+            🔄 Preencher
+          </button>
+          <button id="addSlideBtn" class="px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold text-[10px] transition-all active:scale-95 uppercase tracking-wider">
+            + Add
+          </button>
+        </div>
+      </div>
+      <div id="slidesContainer" class="space-y-3"></div>
+    </section>
+
+    <!-- Preview & Download -->
+    <section class="bg-white/5 border border-white/10 rounded-3xl p-5 mb-4 fade-in">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-white font-bold text-xs uppercase tracking-wider">👁️ Preview</h2>
+        <div class="flex gap-2">
+          <button id="regeneratePreviewBtn" class="px-3 py-1.5 bg-white/10 hover:bg-brand-500 text-white rounded-xl font-bold text-[10px] transition-all active:scale-95 uppercase tracking-wider border border-white/10">
+            🔄 Atualizar
+          </button>
+          <button id="downloadAllBtn" class="px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold text-[10px] transition-all active:scale-95 uppercase tracking-wider">
+            💾 Baixar Tudo
+          </button>
+        </div>
+      </div>
+      <div id="previewContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
+      <div id="loadingContainer" class="hidden flex items-center justify-center py-12">
+        <div class="spinner"></div>
+        <span class="ml-3 text-slate-400 text-sm font-semibold">Gerando imagens...</span>
+      </div>
+    </section>
+
+    <footer class="text-center text-slate-600 text-[10px] font-semibold py-6">
+      PostaFit © 2026 — Powered by Osorio AI Labs
+    </footer>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script>
+    // ─── PROMPT LIBRARY ──────────────────────────────────────────
+    const PROMPT_CATEGORIES = {
+      motivacional: { icon: '🔥', label: 'Motivacional' },
+      dica: { icon: '⚡', label: 'Dica Rápida' },
+      resultado: { icon: '📊', label: 'Resultado' },
+      nutricao: { icon: '🥗', label: 'Nutrição' },
+      mentalidade: { icon: '🧠', label: 'Mentalidade' },
+      exercicio: { icon: '💪', label: 'Exercício' },
+    };
+
+    const PROMPT_LIBRARY = {
+      motivacional: [
+        { title: '🔥 Disciplina Diária', text: 'A disciplina é a ponte entre seus objetivos e suas realizações. Cada novo dia é uma oportunidade de ser melhor do que ontem.' },
+        { title: '⚡ Supere Seus Limites', text: 'Você é muito mais forte do que imagina. Os únicos limites que existem são aqueles que você coloca na sua mente.' },
+        { title: '💪 Constância Vence', text: 'Não são os dias de treino perfeito que importam, mas sim a constância dos dias em que você apareceu mesmo sem vontade.' },
+        { title: '🎯 Foco no Processo', text: 'Pare de buscar resultados rápidos. Apaixone-se pelo processo, e os resultados virão como consequência natural.' },
+        { title: '🏆 Seu Melhor Versão', text: 'A competição mais importante é contra quem você foi ontem. Busque ser 1% melhor a cada dia.' },
+        { title: '🔥 Transformação', text: 'Transformação não acontece da noite para o dia. Acontece através de pequenas escolhas consistentes repetidas dia após dia.' },
+        { title: '⚡ Força Interior', text: 'Dentro de você existe uma força que nem imagina. Quando pensar em desistir, lembre-se do motivo que te fez começar.' },
+        { title: '💪 Mentalidade de Campeão', text: 'Campeões não são feitos na academia. Eles são forjados nas escolhas diárias e na mente inquebrável.' },
+        { title: '🎯 Propósito', text: 'Treinar sem propósito é como navegar sem destino. Defina seu porquê e deixe ele te guiar nos dias difíceis.' },
+        { title: '🏆 Vitórias Diárias', text: 'Celebre cada pequena vitória. Cada repetição, cada gota de suor, cada escolha saudável te leva mais perto do seu objetivo.' },
+        { title: '🔥 Coragem para Mudar', text: 'Mudar dói no começo, mas viver estagnado dói para sempre. Tenha coragem de dar o primeiro passo hoje.' },
+        { title: '⚡ Determinação', text: 'Determinação é o que transforma sonhos em realidade. Quando o corpo pede para parar, a mente precisa continuar.' },
+      ],
+      dica: [
+        { title: '⚡ Treino HIIT', text: 'HIIT queima calorias por até 48 horas após o treino. Apenas 20 minutos são suficientes para um treino eficiente.' },
+        { title: '💧 Hidratação no Treino', text: 'Beba água antes, durante e depois do treino. A desidratação de apenas 2% já reduz seu desempenho significativamente.' },
+        { title: '😴 Sono e Resultados', text: 'Dormir bem é tão importante quanto treinar. É durante o sono que seus músculos se recuperam e crescem.' },
+        { title: '🥩 Proteína Pós-Treino', text: 'Consuma proteína até 2 horas após o treino para maximizar a síntese muscular. 1,6 a 2,2g por kg de peso é a meta diária.' },
+        { title: '🏋️ Técnica Primeiro', text: 'Antes de aumentar a carga, domine a técnica. Um movimento bem executado com peso moderado vale mais que carga máxima com má forma.' },
+        { title: '⏱ Tempo de Descanso', text: 'Descanse 60-90 segundos entre séries para hipertrofia, e 2-3 minutos para força. Respeitar o tempo é tão importante quanto o exercício.' },
+        { title: '🦵 Aquecimento Obrigatório', text: 'Nunca pule o aquecimento. 5-10 minutos de mobilidade e ativação muscular previnem lesões e melhoram seu desempenho.' },
+        { title: '📈 Progressão de Carga', text: 'Para continuar evoluindo, aumente a carga ou o número de repetições a cada 2-3 semanas. Seu corpo precisa de novos estímulos.' },
+        { title: '🥗 Jejum Intermitente', text: 'Jejum intermitente pode ajudar na perda de gordura, mas não é para todos. Consulte um profissional antes de começar.' },
+        { title: '💪 Exercícios Compostos', text: 'Priorize exercícios compostos como agachamento, leg press e puxada. Eles recrutam mais músculos e queimam mais calorias.' },
+        { title: '🧘 Alongamento Pós-Treino', text: '5 minutos de alongamento após o treino melhoram sua flexibilidade e aceleram a recuperação muscular. Não pule essa etapa.' },
+        { title: '📊 Frequência Ideal', text: 'Treinar 4-5 vezes por semana é o ideal para a maioria das pessoas. Menos que 3 dias você estagna, mais que 6 pode overtraining.' },
+      ],
+      resultado: [
+        { title: '📊 -12kg em 3 Meses', text: 'Com dedicação e o plano certo, a transformação acontece. Pequenas mudanças na alimentação e treino regular fazem toda a diferença.' },
+        { title: '🏆 Shape de Verão', text: 'O verão chega para todos, mas o shape é só para quem se dedicou. Comece hoje e colha os resultados amanhã.' },
+        { title: '📈 Evolução Real', text: 'Não compare seu início com o meio da jornada de ninguém. Cada um tem seu tempo. O importante é não parar.' },
+        { title: '🎯 Meta Batida', text: 'Estabeleça metas realistas e alcançáveis. Uma meta de cada vez, um dia de cada vez. É assim que se constrói um novo corpo.' },
+        { title: '⚡ 30 Dias de Transformação', text: 'Em 30 dias você pode criar um novo hábito. Em 90 dias você pode transformar seu corpo. O segredo é começar hoje.' },
+        { title: '💪 Força e Estética', text: 'Resultado estético é consequência de treinos com foco em força. Quando você fica mais forte, seu corpo se remodela naturalmente.' },
+        { title: '📉 Gordura Perdida', text: 'Perca gordura sem perder massa muscular. O segredo é déficit calórico moderado com ingestão alta de proteínas e treino de força.' },
+        { title: '🏅 Meta de Repetições', text: 'Aumentar em 1 repetição por semana parece pouco, mas em 3 meses são 12 repetições a mais. A evolução é um acúmulo de pequenos ganhos.' },
+        { title: '📊 Reeducação Alimentar', text: 'Resultado duradouro vem de reeducação alimentar, não de dieta restritiva. Aprenda a comer bem para sempre.' },
+        { title: '🔥 Queima de Gordura', text: 'Treino de força combinado com cardio moderado é a combinação mais eficaz para queimar gordura sem perder massa magra.' },
+        { title: '🎯 Shape Definido', text: 'Definição muscular não é apenas treinar muito, é treinar certo com a alimentação ajustada. Não existe milagre, existe método.' },
+        { title: '📈 Progresso Real', text: 'Tire fotos a cada 15 dias. A diferença sutil no espelho de um dia para o outro se acumula em uma transformação visível em semanas.' },
+      ],
+      nutricao: [
+        { title: '🥗 Café da Manhã Fit', text: 'Um café da manhã rico em proteínas e fibras mantém sua saciedade e energia até o almoço. Inclua ovos, aveia e frutas.' },
+        { title: '🥩 Proteína Magra', text: 'Frango, peixe, ovos e cortes magros de carne são fontes de proteína de alto valor biológico. Distribua em 4-6 refeições ao dia.' },
+        { title: '🥑 Gorduras Boas', text: 'Abacate, azeite, castanhas e sementes são fontes de gordura boa que ajudam na produção hormonal e absorção de vitaminas.' },
+        { title: '🍚 Carboidrato Inteligente', text: 'Prefira carboidratos integrais como batata doce, arroz integral e aveia. Eles fornecem energia de liberação lenta para seus treinos.' },
+        { title: '💧 Beba Água', text: '2 a 3 litros de água por dia são essenciais para o bom funcionamento do metabolismo. A água também ajuda no controle da fome.' },
+        { title: '🥦 Micronutrientes', text: 'Vegetais verdes escuros são ricos em ferro, cálcio e vitaminas. Inclua brócolis, espinafre e couve nas suas refeições.' },
+        { title: '⏰ Horário das Refeições', text: 'Comer de 3 em 3 horas mantém seu metabolismo ativo e evita picos de fome. Planeje suas refeições com antecedência.' },
+        { title: '🍽 Controle de Porções', text: 'Use o método do prato: 1/2 de vegetais, 1/4 de proteína, 1/4 de carboidrato. Simples e eficaz para controlar as calorias.' },
+        { title: '🥜 Lanches Inteligentes', text: 'Tenha opções saudáveis sempre à mão: castanhas, frutas, iogurte grego e barras de proteína evitam escolhas ruins na fome.' },
+        { title: '📝 Planejamento Alimentar', text: 'Prepare suas refeições do dia seguinte com antecedência. Quem planeja, não erra na alimentação.' },
+        { title: '🚫 Evite Açúcar', text: 'O açúcar refinado é inflamatório e atrapalha seus resultados. Troque por adoçantes naturais como stevia ou mel com moderação.' },
+        { title: '🥤 Shake Pós-Treino', text: 'Um shake de whey protein com banana e aveia é uma refeição pós-treino completa. Rápido, prático e eficiente para recuperação.' },
+      ],
+      mentalidade: [
+        { title: '🧠 Mente Forte', text: 'Um corpo forte começa com uma mente forte. Treine sua mentalidade todos os dias com pensamentos positivos e foco no progresso.' },
+        { title: '🎯 Foco no Presente', text: 'Não se preocupe com o resultado final. Concentre-se no treino de hoje, na refeição de agora. O futuro é construído no presente.' },
+        { title: '💪 Autoestima', text: 'Seu valor não é medido pelo seu peso ou pelo número de repetições. Você já é incrível por estar se dedicando a ser melhor.' },
+        { title: '🧘 Resiliência', text: 'Os maiores desafios são os maiores professores. Cada obstáculo superado te torna mais forte para o próximo.' },
+        { title: '📵 Desconecte-se', text: 'Desligue as redes sociais por 1 hora e foque em você. O barulho externo atrapalha sua conexão com seus objetivos reais.' },
+        { title: '🌅 Gratidão', text: 'Comece cada treino agradecendo por ter um corpo que pode se mover. Gratidão muda sua perspectiva e sua energia.' },
+        { title: '🔄 Recomeçar', text: 'Um dia ruim não apaga uma semana de acertos. Amanhã é uma nova chance de recomeçar e fazer melhor.' },
+        { title: '🎯 Objetivos Claros', text: 'Escreva seus objetivos. Quem escreve tem 42% mais chances de realizá-los. Coloque no papel o que você quer alcançar.' },
+        { title: '🧠 Mindset de Crescimento', text: 'Acredite que você pode melhorar. Pessoas com mindset de crescimento aprendem mais, persistem mais e alcançam mais.' },
+        { title: '⏳ Paciência', text: 'Resultados levam tempo. Seu corpo não mudou da noite para o dia, mas cada treino é um tijolo na construção do seu melhor eu.' },
+        { title: '💬 Autodiálogo', text: 'A forma como você fala consigo mesmo importa. Troque "não consigo" por "ainda não consigo". Pequena mudança, grande impacto.' },
+        { title: '🎵 Energia Positiva', text: 'Sua energia atrai sua realidade. Mantenha pensamentos positivos, mesmo nos dias difíceis. O universo responde à sua vibração.' },
+      ],
+      exercicio: [
+        { title: '🏋️ Agachamento Perfeito', text: 'Mantenha as costas retas, joelhos alinhados com os pés e desça até formar 90 graus. Respiração controlada é fundamental.' },
+        { title: '💪 Supino Reto', text: 'Cotovelos em 45 graus com o corpo, barra na altura do peito, empurre expirando. O movimento controlado vale mais que carga máxima.' },
+        { title: '🏋️ Puxada Alta', text: 'Mãos na largura dos ombros, puxe a barra até o peito, contraia as escápulas. Costas retas, olhar para frente.' },
+        { title: '🦵 Leg Press', text: 'Pés na largura dos ombros, desça até 90 graus, empurre com os calcanhares. Nunca estenda completamente os joelhos.' },
+        { title: '💪 Rosca Direta', text: 'Braços fixos ao lado do corpo, gire o punho no topo do movimento. Controle na descida é mais importante que a subida.' },
+        { title: '🏋️ Remada Curvada', text: 'Tronco inclinado a 45 graus, puxe a barra em direção ao abdômen, contraia as costas no topo. Cabeça alinhada com a coluna.' },
+        { title: '🦵 Cadeira Extensora', text: 'Ajuste o banco para que seus joelhos fiquem alinhados com o eixo. Estenda as pernas completamente e segure por 1 segundo.' },
+        { title: '💪 Desenvolvimento', text: 'Halteres na altura dos ombros, empurre para cima até estender os braços. Não arqueie as costas. Cotovelos levemente à frente.' },
+        { title: '🏋️ Puxada na Frente', text: 'Barra na frente, mãos abertas, puxe até o peito. Mantenha o peito aberto e as escápulas contraídas durante todo o movimento.' },
+        { title: '🦵 Mesa Flexora', text: 'Deitado de bruços, ajuste o apoio nos tornozelos. Flexione as pernas até 90 graus, segure e desça controladamente.' },
+        { title: '💪 Elevação Lateral', text: 'Com halteres leves, eleve os braços lateralmente até a altura dos ombros. Cotovelos levemente flexionados. Controle é tudo.' },
+        { title: '🏋️ Stiff', text: 'Com halteres ou barra, desça o tronco mantendo as pernas semiflexionadas. Sinta o alongamento dos posteriores da coxa.' },
+      ]
+    };
+
+    // ─── IMAGE STYLES ───────────────────────────────────────────
+    const IMAGE_STYLES = [
+      { id: 'gradient',   label: 'Gradiente',    icon: '🎨', prompt: 'fitness motivational gradient orange dark style' },
+      { id: 'dark-neon',  label: 'Dark Neon',    icon: '🌆', prompt: 'fitness gym dark neon cyberpunk style' },
+      { id: 'gym',        label: 'Academia',     icon: '🏋️', prompt: 'modern gym equipment fitness center dark style' },
+      { id: 'nature',     label: 'Natureza',     icon: '🌿', prompt: 'outdoor workout nature fitness sunrise style' },
+      { id: 'abstract',   label: 'Abstrato',     icon: '✨', prompt: 'abstract geometric fitness energy flowing style' },
+      { id: 'clean',      label: 'Clean Minimal', icon: '⬜', prompt: 'clean minimal fitness aesthetic studio style' },
+    ];
+
+    // ─── STATE ──────────────────────────────────────────────────
+    const state = {
+      logoDataURL: localStorage.getItem('postafit_logo') || '',
+      imageStyle: localStorage.getItem('postafit_style') || 'gradient',
+      slides: [],
+      previews: [],
+      currentCategory: 'motivacional'
+    };
+
+    // ─── DOM REFS ──────────────────────────────────────────────
+    const $ = (s) => document.querySelector(s);
+    const $$ = (s) => document.querySelectorAll(s);
+
+    // ─── INIT ───────────────────────────────────────────────────
+    function init() {
+      if (state.logoDataURL) showLogo(state.logoDataURL);
+      loadSlidesFromStorage();
+      renderStyles();
+      renderDailyPrompt();
+      renderLibrary();
+      renderSlides();
+      generateAllPreviews();
+      setupTabs();
+      setupCategories();
+      setupDailyBadge();
+      bindGlobalEvents();
+    }
+
+    function setupDailyBadge() {
+      const days = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
+      const hoje = new Date();
+      const dia = hoje.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      const dow = days[hoje.getDay()];
+      $('#dailyBadge').textContent = `${dow} ${dia}`;
+    }
+
+    // ─── PROMPT CABECALHO ─────────────────────────────────────
+    function getDayOfYear() {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), 0, 0);
+      const diff = (now - start) / (1000 * 60 * 60 * 24);
+      return Math.floor(diff);
+    }
+
+    function getRandomSeed() {
+      return getDayOfYear() + new Date().getFullYear();
+    }
+
+    function seededRandom(seed) {
+      const x = Math.sin(seed * 9301 + 49297) * 233280;
+      return x - Math.floor(x);
+    }
+
+    function pickDailyPrompt() {
+      const seed = getRandomSeed();
+      const cats = Object.keys(PROMPT_LIBRARY);
+      const catIdx = Math.floor(seededRandom(seed) * cats.length);
+      const cat = cats[catIdx];
+      const pool = PROMPT_LIBRARY[cat];
+      const promptIdx = Math.floor(seededRandom(seed + 999) * pool.length);
+      return { category: cat, prompt: pool[promptIdx] };
+    }
+
+    function renderDailyPrompt() {
+      const daily = pickDailyPrompt();
+      const cat = PROMPT_CATEGORIES[daily.category];
+      $('#dailyPromptCategory').textContent = `${cat.icon} ${cat.label}`;
+      $('#dailyPromptTitle').textContent = daily.prompt.title;
+      $('#dailyPromptText').textContent = daily.prompt.text;
+    }
+
+    // ─── PROMPT LIBRARY ────────────────────────────────────────
+    function renderLibrary() {
+      const cat = state.currentCategory;
+      const pool = PROMPT_LIBRARY[cat] || [];
+      const grid = $('#libraryGrid');
+      grid.innerHTML = '';
+      pool.forEach((p, i) => {
+        const card = document.createElement('div');
+        card.className = 'prompt-card p-3 rounded-xl bg-white/5 border border-white/10';
+        card.innerHTML = `
+          <p class="text-white font-bold text-xs mb-1">${p.title}</p>
+          <p class="text-slate-400 text-[11px] leading-relaxed">${p.text.substring(0, 80)}...</p>
+        `;
+        card.addEventListener('click', () => {
+          usePrompt(p);
+          showToast(`Prompt "${p.title}" aplicado!`, 'success');
+        });
+        grid.appendChild(card);
+      });
+    }
+
+    // ─── IMAGE STYLES ──────────────────────────────────────────
+    function renderStyles() {
+      const grid = $('#styleGrid');
+      grid.innerHTML = '';
+      IMAGE_STYLES.forEach(s => {
+        const btn = document.createElement('button');
+        const isSelected = s.id === state.imageStyle;
+        btn.className = `style-btn p-3 rounded-xl border-2 text-center transition-all active:scale-95 ${isSelected ? 'selected border-brand-500 bg-brand-500/10' : 'border-white/10 bg-white/5 hover:border-brand-500/50'}`;
+        btn.dataset.style = s.id;
+        btn.innerHTML = `
+          <div class="text-xl mb-0.5">${s.icon}</div>
+          <div class="text-[10px] font-bold ${isSelected ? 'text-brand-400' : 'text-slate-400'}">${s.label}</div>
+        `;
+        btn.addEventListener('click', () => {
+          state.imageStyle = s.id;
+          localStorage.setItem('postafit_style', s.id);
+          renderStyles();
+          generateAllPreviews();
+        });
+        grid.appendChild(btn);
+      });
+    }
+
+    function getCurrentStylePrompt() {
+      const found = IMAGE_STYLES.find(s => s.id === state.imageStyle);
+      return found ? found.prompt : IMAGE_STYLES[0].prompt;
+    }
+
+    // ─── LOGO ──────────────────────────────────────────────────
+    $('#logoInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        state.logoDataURL = ev.target.result;
+        localStorage.setItem('postafit_logo', state.logoDataURL);
+        showLogo(state.logoDataURL);
+        generateAllPreviews();
+        showToast('Logo carregada!', 'success');
+      };
+      reader.readAsDataURL(file);
+    });
+
+    $('#clearLogoBtn').addEventListener('click', () => {
+      state.logoDataURL = '';
+      localStorage.removeItem('postafit_logo');
+      hideLogo();
+      generateAllPreviews();
+    });
+
+    function showLogo(dataURL) {
+      $('#logoPreview').classList.remove('hidden');
+      $('#logoPreviewImg').src = dataURL;
+      $('#logoStatus').textContent = 'OK ✓';
+      $('#logoStatus').className = 'text-[10px] text-green-400 font-semibold';
+      $('#clearLogoBtn').classList.remove('hidden');
+    }
+
+    function hideLogo() {
+      $('#logoPreview').classList.add('hidden');
+      $('#logoPreviewImg').src = '';
+      $('#logoInput').value = '';
+      $('#logoStatus').textContent = 'Nenhuma';
+      $('#logoStatus').className = 'text-[10px] text-slate-500 font-semibold';
+      $('#clearLogoBtn').classList.add('hidden');
+    }
+
+    // ─── TABS ──────────────────────────────────────────────────
+    function setupTabs() {
+      $$('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tab = btn.dataset.promptTab;
+          $$('.tab-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          $$('.prompt-tab').forEach(t => t.classList.add('hidden'));
+          const target = document.getElementById(tab + 'Tab');
+          if (target) target.classList.remove('hidden');
+          const titles = { daily: '📝 Prompt do Dia', library: '📚 Biblioteca', custom: '✏️ Prompt Customizado' };
+          $('#promptSectionTitle').textContent = titles[tab] || '📝 Prompt';
+        });
+      });
+    }
+
+    // ─── CATEGORIES ────────────────────────────────────────────
+    function setupCategories() {
+      $$('.cat-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const cat = btn.dataset.cat;
+          state.currentCategory = cat;
+          $$('.cat-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          btn.className = 'cat-btn px-3 py-1.5 rounded-xl border border-brand-500 text-[10px] font-bold text-brand-400 uppercase tracking-wider bg-brand-500/10';
+          renderLibrary();
+        });
+      });
+    }
+
+    // ─── USE PROMPT ────────────────────────────────────────────
+    function usePrompt(prompt, count = 3) {
+      state.slides = [];
+      for (let i = 0; i < count; i++) {
+        const variations = [
+          { title: prompt.title, text: prompt.text },
+          { title: `${PROMPT_CATEGORIES[state.currentCategory]?.icon || '🔥'} Dica ${i + 1}`, text: `Aplique essa dica no seu dia a dia e veja a diferença nos seus resultados.` },
+          { title: '📲 Chame Agora', text: `Claudinei Mineiro Fit — Transforme seu corpo com acompanhamento personalizado. Resultado real para quem leva a sério.` },
+        ];
+        state.slides.push(variations[i] || variations[0]);
+      }
+      saveSlides();
+      renderSlides();
+      generateAllPreviews();
+    }
+
+    function fillSlidesFromPrompt() {
+      const hasCustom = $('#customTab').classList.contains('hidden') === false;
+      if (hasCustom && $('#customPromptTitle').value.trim()) {
+        state.slides = [
+          { title: $('#customPromptTitle').value.trim(), text: $('#customPromptText').value.trim() || 'Edite este texto para seu carrossel.' },
+          { title: '⚡ Dica do Dia', text: 'Aplique essa dica no seu dia a dia e veja a diferença nos seus resultados.' },
+          { title: '📲 Comece Agora', text: 'Claudinei Mineiro Fit — Transforme seu corpo com acompanhamento personalizado. Resultado real para quem leva a sério.' },
+        ];
+        saveSlides(); renderSlides(); generateAllPreviews();
+        showToast('Prompt customizado aplicado!', 'success');
+        return;
+      }
+
+      const daily = pickDailyPrompt();
+      usePrompt(daily.prompt, 3);
+      showToast(`Prompt do dia aplicado!`, 'success');
+    }
+
+    $('#useDailyPromptBtn').addEventListener('click', fillSlidesFromPrompt);
+    $('#refreshDailyBtn').addEventListener('click', () => {
+      renderDailyPrompt();
+      showToast('Novo prompt do dia!', 'success');
+    });
+    $('#useCustomPromptBtn').addEventListener('click', fillSlidesFromPrompt);
+    $('#fillSlidesBtn').addEventListener('click', () => {
+      if (state.slides.length < 3) {
+        fillSlidesFromPrompt();
+      } else {
+        const n = Math.min(state.slides.length, 3);
+        const daily = pickDailyPrompt();
+        for (let i = 0; i < n; i++) {
+          state.slides[i] = { title: daily.prompt.title, text: daily.prompt.text };
+        }
+        saveSlides(); renderSlides(); generateAllPreviews();
+        showToast('Slides atualizados!', 'success');
+      }
+    });
+
+    // ─── SLIDES ────────────────────────────────────────────────
+    const DEFAULT_SLIDES = [
+      { title: '🔥 Transforme seu corpo', text: 'Chega de desculpas! Com disciplina e o método certo, você pode alcançar o shape dos seus sonhos.' },
+      { title: '⚡ Treinos inteligentes', text: 'Cada exercício tem um propósito. Periodização inteligente para maximizar resultados sem lesionar.' },
+      { title: '📈 Resultado real', text: 'Alunos transformados. Seu antes e depois pode ser o próximo.' },
+    ];
+
+    function loadSlidesFromStorage() {
+      try {
+        const saved = localStorage.getItem('postafit_slides');
+        if (saved) { state.slides = JSON.parse(saved); if (state.slides.length >= 3) return; }
+      } catch (e) {}
+      state.slides = DEFAULT_SLIDES.map(s => ({ ...s }));
+    }
+
+    function saveSlides() { localStorage.setItem('postafit_slides', JSON.stringify(state.slides)); }
+
+    function renderSlides() {
+      const c = $('#slidesContainer');
+      c.innerHTML = '';
+      state.slides.forEach((slide, i) => {
+        const div = document.createElement('div');
+        div.className = 'slide-card bg-white/5 border border-white/10 rounded-2xl p-4 fade-in';
+        div.innerHTML = `
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-white/30 font-black text-[10px] uppercase tracking-wider">Slide ${i + 1}</span>
+            ${state.slides.length > 3 ? `<button class="remove-slide text-slate-600 hover:text-red-400 text-xs font-bold transition-colors" data-index="${i}">✕</button>` : ''}
+          </div>
+          <div class="space-y-2">
+            <input type="text" class="slide-title w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white text-sm font-semibold focus:outline-none focus:border-brand-500 transition-colors" value="${escHtml(slide.title)}" data-index="${i}" />
+            <textarea rows="2" class="slide-text w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-brand-500 transition-colors resize-none" data-index="${i}">${escHtml(slide.text)}</textarea>
+          </div>
+        `;
+        c.appendChild(div);
+      });
+
+      c.querySelectorAll('.slide-title').forEach(inp => {
+        inp.addEventListener('input', (e) => {
+          const i = parseInt(e.target.dataset.index);
+          state.slides[i].title = e.target.value;
+          saveSlides(); schedulePreview();
+        });
+      });
+      c.querySelectorAll('.slide-text').forEach(inp => {
+        inp.addEventListener('input', (e) => {
+          const i = parseInt(e.target.dataset.index);
+          state.slides[i].text = e.target.value;
+          saveSlides(); schedulePreview();
+        });
+      });
+      c.querySelectorAll('.remove-slide').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const i = parseInt(e.target.dataset.index);
+          state.slides.splice(i, 1);
+          saveSlides(); renderSlides(); generateAllPreviews();
+          $('#slideCount').textContent = `(${state.slides.length})`;
+        });
+      });
+      $('#slideCount').textContent = `(${state.slides.length})`;
+    }
+
+    $('#addSlideBtn').addEventListener('click', () => {
+      state.slides.push({ title: '💪 Novo Slide', text: 'Edite este texto com sua mensagem personalizada.' });
+      saveSlides(); renderSlides(); generateAllPreviews();
+      const cards = $$('.slide-card');
+      if (cards.length) cards[cards.length - 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+
+    // ─── IMAGE GENERATION ──────────────────────────────────────
+    let previewTimer = null;
+    function schedulePreview() { clearTimeout(previewTimer); previewTimer = setTimeout(generateAllPreviews, 600); }
+
+    function escHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+    async function generateAllPreviews() {
+      const c = $('#previewContainer'); c.innerHTML = '';
+      $('#loadingContainer').classList.remove('hidden');
+
+      const W = 1080, H = 1080;
+      const promises = state.slides.map((s, i) => generateSlideImage(s, i, W, H));
+      const blobs = await Promise.all(promises);
+
+      $('#loadingContainer').classList.add('hidden');
+      state.previews = blobs;
+
+      blobs.forEach((blob, i) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const div = document.createElement('div');
+        div.className = 'flex flex-col gap-1.5 fade-in';
+        div.innerHTML = `
+          <img src="${url}" class="preview-canvas w-full aspect-square object-cover" alt="Slide ${i + 1}" />
+          <button class="download-single px-2 py-1.5 bg-white/10 hover:bg-brand-500 border border-white/20 rounded-xl text-white text-[10px] font-bold transition-all active:scale-95" data-index="${i}">💾 Slide ${i + 1}</button>
+        `;
+        c.appendChild(div);
+      });
+
+      c.querySelectorAll('.download-single').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const i = parseInt(btn.dataset.index);
+          if (state.previews[i]) downloadBlob(state.previews[i], `PostaFit_Slide_${i + 1}.png`);
+        });
+      });
+    }
+
+    async function generateSlideImage(slide, idx, W, H) {
+      const canvas = document.createElement('canvas');
+      canvas.width = W; canvas.height = H;
+      const ctx = canvas.getContext('2d');
+
+      await drawBackground(ctx, W, H, idx);
+      if (state.logoDataURL) await drawLogo(ctx, W, H);
+      drawContent(ctx, W, H, slide, idx);
+
+      return new Promise(resolve => canvas.toBlob(resolve, 'image/png', 0.95));
+    }
+
+    async function drawBackground(ctx, W, H, idx) {
+      const styleId = state.imageStyle;
+      if (styleId === 'gradient') {
+        const grad = ctx.createLinearGradient(0, 0, W, H);
+        const colors = [['#f97316','#ea580c'],['#7c2d12','#c2410c'],['#1e293b','#0f172a'],['#9a3412','#431407']];
+        const c = colors[idx % colors.length];
+        grad.addColorStop(0, c[0]); grad.addColorStop(1, c[1]);
+        ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          ctx.arc((i * 400 + 200 * idx) % W, (i * 300 + 100 * idx) % H, 180 + i * 80, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255,255,255,${0.03 + i * 0.02})`; ctx.fill();
+        }
+      } else {
+        const style = IMAGE_STYLES.find(s => s.id === styleId);
+        const prompt = style ? style.prompt : IMAGE_STYLES[0].prompt;
+        try {
+          const img = await loadImage(`https://image.pollinations.ai/prompt/${encodeURIComponent(prompt + ', 1080x1080, high quality')}`);
+          ctx.drawImage(img, 0, 0, W, H);
+          ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, 0, W, H);
+        } catch {
+          const grad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W/1.5);
+          grad.addColorStop(0, '#1e293b'); grad.addColorStop(1, '#020617');
+          ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+        }
+      }
+    }
+
+    async function drawLogo(ctx, W, H) {
+      try {
+        const img = await loadImage(state.logoDataURL);
+        const logoW = 160, logoH = 160 * (img.height / img.width);
+        const pad = 32;
+        ctx.save();
+        ctx.globalAlpha = 0.92;
+        ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 12;
+        ctx.drawImage(img, W - logoW - pad, H - logoH - pad, logoW, logoH);
+        ctx.restore();
+      } catch (e) { console.warn('Logo error:', e); }
+    }
+
+    function drawContent(ctx, W, H, slide, idx) {
+      const tmpl = state.template || 'dica';
+      const title = slide.title || ''; const text = slide.text || ''; const pad = 50;
+
+      ctx.fillStyle = '#f97316'; ctx.fillRect(0, 0, W, 6);
+
+      // Brand top-left
+      ctx.save();
+      ctx.fillStyle = 'rgba(249,115,22,0.12)';
+      ctx.beginPath(); ctx.roundRect(pad, pad - 5, 110, 28, 14); ctx.fill();
+      ctx.fillStyle = '#fb923c'; ctx.font = 'bold 12px Inter, sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText('⚡ PostaFit', pad + 12, pad + 14);
+      ctx.restore();
+
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+      if (tmpl === 'motivacional') {
+        ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = 'bold 20px Inter, sans-serif';
+        ctx.fillText('🔥 MOTIVAÇÃO', W/2, H * 0.30);
+        ctx.fillStyle = '#ffffff'; ctx.font = 'bold 56px Inter, sans-serif';
+        wrapText(ctx, title, W/2, H * 0.42, W - pad * 2, 62, 'center');
+        ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = '24px Inter, sans-serif';
+        wrapText(ctx, text, W/2, H * 0.60, W - pad * 2, 32, 'center');
+        ctx.fillStyle = '#f97316'; ctx.font = 'bold 20px Inter, sans-serif';
+        ctx.fillText('🔗 Claudinei Mineiro Fit', W/2, H * 0.88);
+      } else if (tmpl === 'resultado') {
+        ctx.fillStyle = '#f97316'; ctx.font = 'bold 100px Inter, sans-serif';
+        ctx.fillText('🏆', W/2, H * 0.18);
+        ctx.fillStyle = '#ffffff'; ctx.font = 'bold 46px Inter, sans-serif';
+        wrapText(ctx, title, W/2, H * 0.35, W - pad * 2, 50, 'center');
+        ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = '22px Inter, sans-serif';
+        wrapText(ctx, text, W/2, H * 0.52, W - pad * 2, 30, 'center');
+        ctx.fillStyle = 'rgba(249,115,22,0.1)';
+        ctx.beginPath(); ctx.roundRect(W*0.1, H*0.76, W*0.8, 60, 14); ctx.fill();
+        ctx.fillStyle = '#fb923c'; ctx.font = 'bold 18px Inter, sans-serif';
+        ctx.fillText('📲 Comece sua transformação hoje!', W/2, H*0.80);
+      } else {
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath(); ctx.roundRect(W/2 - 80, pad + 16, 160, 36, 18); ctx.fill();
+        ctx.fillStyle = '#ffffff'; ctx.font = 'bold 16px Inter, sans-serif';
+        ctx.fillText('⚡ DICA RÁPIDA', W/2, pad + 35);
+        ctx.fillStyle = '#ffffff'; ctx.font = 'bold 42px Inter, sans-serif';
+        wrapText(ctx, title, W/2, H*0.34, W - pad*2, 48, 'center');
+        ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.font = '24px Inter, sans-serif';
+        wrapText(ctx, text, W/2, H*0.52, W - pad*2, 32, 'center');
+        const bullets = ['🎯 Consistência supera intensidade','⏱ 30 min focados > 2 horas distraído','📱 Acompanhe sua evolução'];
+        ctx.textAlign = 'left';
+        bullets.forEach((b, bi) => {
+          const bx = W*0.12, by = H*0.70 + bi*44;
+          ctx.fillStyle = 'rgba(249,115,22,0.12)';
+          ctx.beginPath(); ctx.roundRect(bx - 8, by - 14, W*0.76, 38, 10); ctx.fill();
+          ctx.fillStyle = '#f0f0f0'; ctx.font = 'bold 18px Inter, sans-serif';
+          ctx.fillText(b, bx + 14, by + 8);
+        });
+      }
+      ctx.restore();
+    }
+
+    // ─── HELPERS ────────────────────────────────────────────────
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image(); img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img); img.onerror = reject;
+        img.src = src;
+      });
+    }
+
+    function wrapText(ctx, text, x, y, maxW, lineH, align = 'left') {
+      if (!text) return;
+      let line = '', ly = y;
+      for (const ch of text) {
+        const test = line + ch;
+        if (ctx.measureText(test).width > maxW && line) {
+          ctx.textAlign = align; ctx.fillText(line, x, ly);
+          line = ch; ly += lineH;
+        } else { line = test; }
+      }
+      if (line) { ctx.textAlign = align; ctx.fillText(line, x, ly); }
+    }
+
+    function downloadBlob(blob, name) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = name;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ─── EVENTS ─────────────────────────────────────────────────
+    function bindGlobalEvents() {
+      $('#regeneratePreviewBtn').addEventListener('click', generateAllPreviews);
+
+      $('#downloadAllBtn').addEventListener('click', async () => {
+        const valid = state.previews.filter(b => b);
+        if (!valid.length) { showToast('Gere as imagens primeiro!', 'error'); return; }
+        if (valid.length === 1) {
+          downloadBlob(valid[0], 'PostaFit_Carrossel.png');
+          showToast('Imagem baixada!', 'success'); return;
+        }
+        const JSZip = window.JSZip;
+        if (!JSZip) { downloadBlob(valid[0], 'PostaFit_Slide_1.png'); return; }
+        const zip = new JSZip();
+        valid.forEach((b, i) => zip.file(`PostaFit_Slide_${i+1}.png`, b));
+        const content = await zip.generateAsync({ type: 'blob' });
+        downloadBlob(content, 'PostaFit_Carrossel.zip');
+        showToast(`${valid.length} slides baixados!`, 'success');
+      });
+    }
+
+    // ─── TOAST ─────────────────────────────────────────────────
+    function showToast(msg, type = 'success') {
+      const existing = document.querySelector('.toast');
+      if (existing) existing.remove();
+      const div = document.createElement('div');
+      div.className = `toast ${type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`;
+      div.textContent = msg;
+      document.body.appendChild(div);
+      setTimeout(() => div.remove(), 3000);
+    }
+
+    // ─── PWA INSTALL ───────────────────────────────────────────
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault(); deferredPrompt = e;
+      $('#installBtn').classList.remove('hidden');
+    });
+    $('#installBtn').addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const result = await deferredPrompt.userChoice;
+        if (result.outcome === 'accepted') { $('#installBtn').classList.add('hidden'); showToast('App instalado! 📲', 'success'); }
+        deferredPrompt = null;
+      }
+    });
+    window.addEventListener('appinstalled', () => {
+      $('#installBtn').classList.add('hidden');
+      showToast('PostaFit instalado! 🎉', 'success');
+    });
+
+    // ─── START ──────────────────────────────────────────────────
+    init();
+  </script>
+</body>
+</html>
