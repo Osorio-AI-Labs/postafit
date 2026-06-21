@@ -936,40 +936,38 @@
     });
 
     // ─── LOGIN ─────────────────────────────────────────────────
-    const PASS_B64 = 'Q2xhdWRpbmVpRmk=';
     let loginAttempts = 0, loginLocked = false;
     function checkLogin() {
       if (localStorage.getItem('postafit_auth') === '1') {
-        $('#loginScreen').classList.add('hidden');
+        document.getElementById('loginScreen').classList.add('hidden');
         setTimeout(init, 50);
       } else {
-        $('#loginScreen').classList.remove('hidden');
+        document.getElementById('loginScreen').classList.remove('hidden');
       }
     }
-    $('#loginBtn').addEventListener('click', () => {
+    document.getElementById('loginBtn').addEventListener('click', function() {
       if (loginLocked) { showToast('Muitas tentativas. Aguarde 10s.', 'error'); return; }
-      const pw = $('#loginPassword').value;
-      if (btoa(pw) === PASS_B64) {
+      if (document.getElementById('loginPassword').value === 'ClaudineiFi') {
         loginAttempts = 0;
         localStorage.setItem('postafit_auth', '1');
-        $('#loginScreen').classList.add('hidden');
+        document.getElementById('loginScreen').classList.add('hidden');
         setTimeout(init, 50);
       } else {
         loginAttempts++;
         if (loginAttempts >= 3) {
           loginLocked = true;
-          setTimeout(() => { loginLocked = false; loginAttempts = 0; }, 10000);
+          setTimeout(function() { loginLocked = false; loginAttempts = 0; }, 10000);
           showToast('Senha incorreta! Bloqueado por 10s.', 'error');
         }
-        $('#loginError').classList.remove('hidden');
-        $('#loginPassword').classList.add('shake');
-        setTimeout(() => $('#loginPassword').classList.remove('shake'), 400);
-        $('#loginPassword').value = '';
-        $('#loginPassword').focus();
+        document.getElementById('loginError').classList.remove('hidden');
+        document.getElementById('loginPassword').classList.add('shake');
+        setTimeout(function() { document.getElementById('loginPassword').classList.remove('shake'); }, 400);
+        document.getElementById('loginPassword').value = '';
+        document.getElementById('loginPassword').focus();
       }
     });
-    $('#loginPassword').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') $('#loginBtn').click();
+    document.getElementById('loginPassword').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') document.getElementById('loginBtn').click();
     });
 
     // ─── START ──────────────────────────────────────────────────
