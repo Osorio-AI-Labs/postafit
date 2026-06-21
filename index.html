@@ -840,37 +840,75 @@
       const style = IMAGE_STYLES.find(s => s.id === styleId);
       const prompt = style ? style.prompt : IMAGE_STYLES[0].prompt;
 
+      // Se o estilo for gradiente local puro, desenha e retorna imediatamente
       if (styleId === 'gradient') {
-        const palettes = [['#f97316','#ea580c'],['#7c2d12','#c2410c'],['#1e293b','#0f172a'],['#9a3412','#431407']];
-        const pal = palettes[idx % 4];
-        const grad = ctx.createLinearGradient(0, 0, W, H);
-        grad.addColorStop(0, pal[0]); grad.addColorStop(1, pal[1]);
-        ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
-        for (let i = 0; i < 3; i++) {
-          ctx.beginPath();
-          ctx.arc((i * 400 + 200 * idx) % W, (i * 300 + 100 * idx) % H, 180 + i * 80, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(255,255,255,${0.03 + i * 0.02})`; ctx.fill();
-        }
+        drawLocalGradient(ctx, W, H, idx);
         return;
       }
 
       const randomSeed = Math.floor(Math.random() * 1000000);
       const fullPrompt = prompt + `, ${W}x${H}, high quality fitness background, dark moody lighting`;
 
-      // 1) Pollinations (mais rápido, sem login)
+      // ─── PASSO 1: Pollinations AI (Principal) ──────────────────────
       try {
-        const img = await loadImage(`https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${W}&height=${H}&nologo=true&seed=${randomSeed}`);
+        const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${W}&height=${H}&nologo=true&seed=${randomSeed}`;
+        const img = await loadImage(pollinationsUrl);
         ctx.drawImage(img, 0, 0, W, H);
         ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, 0, W, H);
+        console.log("Fundo gerado via Pollinations AI.");
         return;
-      } catch { /* fallback */ }
-
-      // 2) Canvas local (Canva nativo) - Alternativa imediata em caso de falha
-      {
-        const grad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W/1.5);
-        grad.addColorStop(0, '#1e293b'); grad.addColorStop(1, '#020617');
-        ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+      } catch (err) {
+        console.warn("Falha no Pollinations AI, tentando Lexica.art...", err);
       }
+
+      // ─── PASSO 2: Lexica.art API (Alternativa 1) ───────────────────
+      try {
+        const lexicaSearchUrl = `https://lexica.art/api/v1/search?q=${encodeURIComponent(prompt + ' fitness gym')}`;
+        const response = await fetch(lexicaSearchUrl);
+        const data = await response.json();
+        if (data && data.images && data.images.length > 0) {
+          const poolSize = Math.min(data.images.length, 15);
+          const chosenImgData = data.images[Math.floor(Math.random() * poolSize)];
+          const imgUrl = chosenImgData.src;
+          const img = await loadImage(imgUrl);
+          ctx.drawImage(img, 0, 0, W, H);
+          ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, 0, W, H);
+          console.log("Fundo carregado via Lexica.art.");
+          return;
+        }
+      } catch (err) {
+        console.warn("Falha no Lexica.art, tentando Unsplash fotográfico...", err);
+      }
+
+      // ─── PASSO 3: Unsplash Fotográfico Temático (Alternativa 2) ─────
+      try {
+        const randomPhotoId = idx % 2 === 0 ? 'photo-1534438327276-14e5300c3a48' : 'photo-1517838277536-f5f99be501cd';
+        const dynamicUnsplashUrl = `https://images.unsplash.com/${randomPhotoId}?w=${W}&h=${H}&fit=crop&q=80`;
+        const img = await loadImage(dynamicUnsplashUrl);
+        ctx.drawImage(img, 0, 0, W, H);
+        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, W, H);
+        console.log("Fundo fotográfico carregado via Unsplash.");
+        return;
+      } catch (err) {
+        console.warn("Falha no Unsplash, usando Canva nativo...", err);
+      }
+
+      // ─── PASSO 4: Canva Fallback (Nativo/Local) ───────────────────
+      drawLocalGradient(ctx, W, H, idx);
+    }
+
+    function drawLocalGradient(ctx, W, H, idx) {
+      const palettes = [['#f97316','#ea580c'],['#7c2d12','#c2410c'],['#1e293b','#0f172a'],['#9a3412','#431407']];
+      const pal = palettes[idx % 4];
+      const grad = ctx.createLinearGradient(0, 0, W, H);
+      grad.addColorStop(0, pal[0]); grad.addColorStop(1, pal[1]);
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.arc((i * 400 + 200 * idx) % W, (i * 300 + 100 * idx) % H, 180 + i * 80, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${0.03 + i * 0.02})`; ctx.fill();
+      }
+      console.log("Fundo gerado via Gradiente Local.");
     }
 
     async function drawLogo(ctx, W, H) {
