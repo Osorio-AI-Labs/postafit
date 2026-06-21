@@ -407,8 +407,8 @@
       return x - Math.floor(x);
     }
 
-    function pickDailyPrompt() {
-      const seed = getRandomSeed();
+    function pickDailyPrompt(forceRandom = false) {
+      const seed = forceRandom ? Math.floor(Math.random() * 1000000) : getRandomSeed();
       const cats = Object.keys(PROMPT_LIBRARY);
       const catIdx = Math.floor(seededRandom(seed) * cats.length);
       const cat = cats[catIdx];
@@ -417,8 +417,8 @@
       return { category: cat, prompt: pool[promptIdx] };
     }
 
-    function renderDailyPrompt() {
-      const daily = pickDailyPrompt();
+    function renderDailyPrompt(forceRandom = false) {
+      const daily = pickDailyPrompt(forceRandom);
       const cat = PROMPT_CATEGORIES[daily.category];
       $('#dailyPromptCategory').textContent = `${cat.icon} ${cat.label}`;
       $('#dailyPromptTitle').textContent = daily.prompt.title;
@@ -594,8 +594,8 @@
 
     $('#useDailyPromptBtn').addEventListener('click', fillSlidesFromPrompt);
     $('#refreshDailyBtn').addEventListener('click', () => {
-      renderDailyPrompt();
-      showToast('Novo prompt do dia!', 'success');
+      renderDailyPrompt(true);
+      showToast('Novo prompt sorteado!', 'success');
     });
     $('#useCustomPromptBtn').addEventListener('click', fillSlidesFromPrompt);
     $('#fillSlidesBtn').addEventListener('click', () => {
@@ -773,11 +773,12 @@
         return;
       }
 
+      const randomSeed = Math.floor(Math.random() * 1000000);
       const fullPrompt = prompt + ', 1080x1080, high quality fitness background, dark moody lighting';
 
       // 1) Pollinations (mais rápido, sem login)
       try {
-        const img = await loadImage(`https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}`);
+        const img = await loadImage(`https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1080&height=1080&nologo=true&seed=${randomSeed}`);
         ctx.drawImage(img, 0, 0, W, H);
         ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, 0, W, H);
         return;
