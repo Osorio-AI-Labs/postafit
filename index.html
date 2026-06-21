@@ -353,6 +353,7 @@
       generateAllPreviews();
       setupTabs();
       setupCategories();
+      setupLibraryDelegation();
       setupDailyBadge();
       bindGlobalEvents();
     }
@@ -406,18 +407,31 @@
       const pool = PROMPT_LIBRARY[cat] || [];
       const grid = $('#libraryGrid');
       grid.innerHTML = '';
-      pool.forEach((p, i) => {
+      const frag = document.createDocumentFragment();
+      pool.forEach((p) => {
         const card = document.createElement('div');
         card.className = 'prompt-card p-3 rounded-xl bg-white/5 border border-white/10';
         card.innerHTML = `
-          <p class="text-white font-bold text-xs mb-1">${p.title}</p>
-          <p class="text-slate-400 text-[11px] leading-relaxed">${p.text.substring(0, 80)}...</p>
+          <p class="text-white font-bold text-xs mb-1">${escHtml(p.title)}</p>
+          <p class="text-slate-400 text-[11px] leading-relaxed">${escHtml(p.text.substring(0, 80))}...</p>
         `;
-        card.addEventListener('click', () => {
-          usePrompt(p);
-          showToast(`Prompt "${p.title}" aplicado!`, 'success');
-        });
-        grid.appendChild(card);
+        card.dataset.promptIdx = PROMPT_LIBRARY[cat].indexOf(p);
+        frag.appendChild(card);
+      });
+      grid.appendChild(frag);
+    }
+
+    function setupLibraryDelegation() {
+      const grid = $('#libraryGrid');
+      grid.addEventListener('click', (e) => {
+        const card = e.target.closest('.prompt-card');
+        if (!card) return;
+        const cat = state.currentCategory;
+        const idx = parseInt(card.dataset.promptIdx);
+        const p = PROMPT_LIBRARY[cat][idx];
+        if (!p) return;
+        usePrompt(p);
+        showToast(`Prompt "${p.title}" aplicado!`, 'success');
       });
     }
 
@@ -507,8 +521,12 @@
       $$('.cat-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const cat = btn.dataset.cat;
+          if (state.currentCategory === cat) return;
           state.currentCategory = cat;
-          $$('.cat-btn').forEach(b => b.classList.remove('active'));
+          $$('.cat-btn').forEach(b => {
+            b.classList.remove('active');
+            b.className = 'cat-btn px-3 py-1.5 rounded-xl border border-white/10 text-[10px] font-bold text-slate-400 uppercase tracking-wider';
+          });
           btn.classList.add('active');
           btn.className = 'cat-btn px-3 py-1.5 rounded-xl border border-brand-500 text-[10px] font-bold text-brand-400 uppercase tracking-wider bg-brand-500/10';
           renderLibrary();
@@ -587,9 +605,12 @@
 
     function saveSlides() { localStorage.setItem('postafit_slides', JSON.stringify(state.slides)); }
 
+    const $slidesContainer = $('#slidesContainer');
+
     function renderSlides() {
-      const c = $('#slidesContainer');
+      const c = $slidesContainer;
       c.innerHTML = '';
+      const frag = document.createDocumentFragment();
       state.slides.forEach((slide, i) => {
         const div = document.createElement('div');
         div.className = 'slide-card bg-white/5 border border-white/10 rounded-2xl p-4 fade-in';
@@ -603,33 +624,28 @@
             <textarea rows="2" class="slide-text w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-brand-500 transition-colors resize-none" data-index="${i}">${escHtml(slide.text)}</textarea>
           </div>
         `;
-        c.appendChild(div);
+        frag.appendChild(div);
       });
-
-      c.querySelectorAll('.slide-title').forEach(inp => {
-        inp.addEventListener('input', (e) => {
-          const i = parseInt(e.target.dataset.index);
-          state.slides[i].title = e.target.value;
-          saveSlides();
-        });
-      });
-      c.querySelectorAll('.slide-text').forEach(inp => {
-        inp.addEventListener('input', (e) => {
-          const i = parseInt(e.target.dataset.index);
-          state.slides[i].text = e.target.value;
-          saveSlides();
-        });
-      });
-      c.querySelectorAll('.remove-slide').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const i = parseInt(e.target.dataset.index);
-          state.slides.splice(i, 1);
-          saveSlides(); renderSlides(); generateAllPreviews();
-          $('#slideCount').textContent = `(${state.slides.length})`;
-        });
-      });
-      $('#slideCount').textContent = `(${state.slides.length})`;
+      c.appendChild(frag);
+      $slideCount.textContent = `(${state.slides.length})`;
     }
+
+    $slidesContainer.addEventListener('input', (e) => {
+      const inp = e.target;
+      if (!inp.matches('.slide-title, .slide-text')) return;
+      const i = parseInt(inp.dataset.index);
+      if (inp.classList.contains('slide-title')) state.slides[i].title = inp.value;
+      else state.slides[i].text = inp.value;
+      saveSlides();
+    });
+    $slidesContainer.addEventListener('click', (e) => {
+      const btn = e.target.closest('.remove-slide');
+      if (!btn) return;
+      const i = parseInt(btn.dataset.index);
+      state.slides.splice(i, 1);
+      saveSlides(); renderSlides(); generateAllPreviews();
+      $slideCount.textContent = `(${state.slides.length})`;
+    });
 
     $('#addSlideBtn').addEventListener('click', () => {
       state.slides.push({ title: '💪 Novo Slide', text: 'Edite este texto com sua mensagem personalizada.' });
@@ -643,22 +659,24 @@
 
     function escHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
+    const $slideCount = $('#slideCount');
+
     async function generateAllPreviews() {
       const c = $('#previewContainer'); c.innerHTML = '';
       $('#loadingContainer').classList.remove('hidden');
       const loadText = $('#loadingText');
 
       const W = 1080, H = 1080;
-      const blobs = [];
-      for (let i = 0; i < state.slides.length; i++) {
-        loadText.textContent = `Gerando slide ${i + 1} de ${state.slides.length}...`;
-        const blob = await generateSlideImage(state.slides[i], i, W, H);
-        blobs.push(blob);
-      }
+      loadText.textContent = `Gerando ${state.slides.length} imagens...`;
+      const results = await Promise.allSettled(
+        state.slides.map((slide, i) => generateSlideImage(slide, i, W, H))
+      );
+      const blobs = results.map(r => r.status === 'fulfilled' ? r.value : null);
 
       $('#loadingContainer').classList.add('hidden');
       state.previews = blobs;
 
+      const frag = document.createDocumentFragment();
       blobs.forEach((blob, i) => {
         if (!blob) return;
         const url = URL.createObjectURL(blob);
@@ -671,21 +689,24 @@
             <button class="regenerate-single flex-1 px-2 py-1.5 bg-brand-500/20 hover:bg-brand-500 border border-brand-500/30 rounded-xl text-brand-400 text-[10px] font-bold transition-all active:scale-95" data-index="${i}">🔄 Recriar</button>
           </div>
         `;
-        c.appendChild(div);
+        frag.appendChild(div);
       });
+      c.appendChild(frag);
 
-      c.querySelectorAll('.download-single').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const i = parseInt(btn.dataset.index);
-          if (state.previews[i]) downloadBlob(state.previews[i], `PostaFit_Slide_${i + 1}.png`);
-        });
-      });
+      showToast(`${blobs.filter(Boolean).length} slides gerados! 🎉`, 'success');
+    }
 
-      c.querySelectorAll('.regenerate-single').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const i = parseInt(btn.dataset.index);
-          btn.textContent = '⏳';
-          const blob = await generateSlideImage(state.slides[i], i, W, H);
+    const $previewContainer = $('#previewContainer');
+    $previewContainer.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const i = parseInt(btn.dataset.index);
+      if (btn.classList.contains('download-single')) {
+        if (state.previews[i]) downloadBlob(state.previews[i], `PostaFit_Slide_${i + 1}.png`);
+      } else if (btn.classList.contains('regenerate-single')) {
+        const W = 1080, H = 1080;
+        btn.textContent = '⏳';
+        generateSlideImage(state.slides[i], i, W, H).then(blob => {
           if (blob) {
             state.previews[i] = blob;
             const img = btn.closest('.flex').querySelector('img');
@@ -694,10 +715,8 @@
           btn.textContent = '🔄 Recriar';
           showToast(`Slide ${i + 1} recriado!`, 'success');
         });
-      });
-
-      showToast(`${blobs.filter(Boolean).length} slides gerados! 🎉`, 'success');
-    }
+      }
+    });
 
     async function generateSlideImage(slide, idx, W, H) {
       const canvas = document.createElement('canvas');
@@ -843,15 +862,16 @@
 
     function wrapText(ctx, text, x, y, maxW, lineH, align = 'left') {
       if (!text) return;
+      ctx.textAlign = align;
       let line = '', ly = y;
       for (const ch of text) {
         const test = line + ch;
         if (ctx.measureText(test).width > maxW && line) {
-          ctx.textAlign = align; ctx.fillText(line, x, ly);
+          ctx.fillText(line, x, ly);
           line = ch; ly += lineH;
         } else { line = test; }
       }
-      if (line) { ctx.textAlign = align; ctx.fillText(line, x, ly); }
+      if (line) ctx.fillText(line, x, ly);
     }
 
     function downloadBlob(blob, name) {
@@ -883,14 +903,17 @@
     }
 
     // ─── TOAST ─────────────────────────────────────────────────
+    let toastEl, toastTimer;
     function showToast(msg, type = 'success') {
-      const existing = document.querySelector('.toast');
-      if (existing) existing.remove();
-      const div = document.createElement('div');
-      div.className = `toast ${type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`;
-      div.textContent = msg;
-      document.body.appendChild(div);
-      setTimeout(() => div.remove(), 3000);
+      if (!toastEl) {
+        toastEl = document.createElement('div');
+        toastEl.className = 'toast';
+        document.body.appendChild(toastEl);
+      }
+      clearTimeout(toastTimer);
+      toastEl.className = `toast ${type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`;
+      toastEl.textContent = msg;
+      toastTimer = setTimeout(() => { toastEl.textContent = ''; }, 3000);
     }
 
     // ─── PWA INSTALL ───────────────────────────────────────────
@@ -913,8 +936,14 @@
     });
 
     // ─── LOGIN ─────────────────────────────────────────────────
-    const PASS = 'ClaudineiFi';
-    function checkLogin() {
+    async function hashStr(str) {
+      const buf = new TextEncoder().encode(str);
+      const hash = await crypto.subtle.digest('SHA-256', buf);
+      return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+    const PASS_HASH = '20515db95e79dfc0baf1c748540bc74fbba841a13382593aac68180a38d29503';
+    let loginAttempts = 0, loginLocked = false;
+    async function checkLogin() {
       if (localStorage.getItem('postafit_auth') === '1') {
         $('#loginScreen').classList.add('hidden');
         init();
@@ -922,13 +951,21 @@
         $('#loginScreen').classList.remove('hidden');
       }
     }
-    $('#loginBtn').addEventListener('click', () => {
+    $('#loginBtn').addEventListener('click', async () => {
+      if (loginLocked) { showToast('Muitas tentativas. Aguarde 10s.', 'error'); return; }
       const pw = $('#loginPassword').value;
-      if (pw === PASS) {
+      if (await hashStr(pw) === PASS_HASH) {
+        loginAttempts = 0;
         localStorage.setItem('postafit_auth', '1');
         $('#loginScreen').classList.add('hidden');
         init();
       } else {
+        loginAttempts++;
+        if (loginAttempts >= 3) {
+          loginLocked = true;
+          setTimeout(() => { loginLocked = false; loginAttempts = 0; }, 10000);
+          showToast('Senha incorreta! Bloqueado por 10s.', 'error');
+        }
         $('#loginError').classList.remove('hidden');
         $('#loginPassword').classList.add('shake');
         setTimeout(() => $('#loginPassword').classList.remove('shake'), 400);
