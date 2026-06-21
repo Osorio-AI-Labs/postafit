@@ -937,35 +937,23 @@
 
     // ─── LOGIN ─────────────────────────────────────────────────
     const PASS_B64 = 'Q2xhdWRpbmVpRmk=';
-    const PASS_HASH = '20515db95e79dfc0baf1c748540bc74fbba841a13382593aac68180a38d29503';
-    async function hashStr(str) {
-      if (crypto?.subtle?.digest) {
-        try {
-          const buf = new TextEncoder().encode(str);
-          const hash = await crypto.subtle.digest('SHA-256', buf);
-          return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
-        } catch {}
-      }
-      return btoa(str);
-    }
     let loginAttempts = 0, loginLocked = false;
-    async function checkLogin() {
+    function checkLogin() {
       if (localStorage.getItem('postafit_auth') === '1') {
         $('#loginScreen').classList.add('hidden');
-        init();
+        setTimeout(init, 50);
       } else {
         $('#loginScreen').classList.remove('hidden');
       }
     }
-    $('#loginBtn').addEventListener('click', async () => {
+    $('#loginBtn').addEventListener('click', () => {
       if (loginLocked) { showToast('Muitas tentativas. Aguarde 10s.', 'error'); return; }
       const pw = $('#loginPassword').value;
-      const h = await hashStr(pw);
-      if (h === PASS_HASH || h === PASS_B64) {
+      if (btoa(pw) === PASS_B64) {
         loginAttempts = 0;
         localStorage.setItem('postafit_auth', '1');
         $('#loginScreen').classList.add('hidden');
-        init();
+        setTimeout(init, 50);
       } else {
         loginAttempts++;
         if (loginAttempts >= 3) {
