@@ -418,7 +418,6 @@
       generateAllPreviews();
       setupTabs();
       setupCategories();
-      setupLibraryDelegation();
       setupDailyBadge();
       bindGlobalEvents();
       checkLgpdConsent();
@@ -510,31 +509,24 @@
       const grid = $('#libraryGrid');
       grid.innerHTML = '';
       const frag = document.createDocumentFragment();
-      pool.forEach((p) => {
+      pool.forEach((p, idx) => {
         const card = document.createElement('div');
         card.className = 'prompt-card p-3 rounded-xl bg-white/5 border border-white/10';
         card.innerHTML = `
           <p class="text-white font-bold text-xs mb-1">${escHtml(p.title)}</p>
           <p class="text-slate-400 text-[11px] leading-relaxed">${escHtml(p.text.substring(0, 80))}...</p>
         `;
-        card.dataset.promptIdx = PROMPT_LIBRARY[cat].indexOf(p);
+        card.dataset.promptIdx = idx;
+        
+        // Adiciona o ouvinte de clique diretamente ao card para compatibilidade móvel (Android e iOS)
+        card.addEventListener('click', () => {
+          usePrompt(p);
+          showToast(`Prompt "${p.title}" aplicado!`, 'success');
+        });
+        
         frag.appendChild(card);
       });
       grid.appendChild(frag);
-    }
-
-    function setupLibraryDelegation() {
-      const grid = $('#libraryGrid');
-      grid.addEventListener('click', (e) => {
-        const card = e.target.closest('.prompt-card');
-        if (!card) return;
-        const cat = state.currentCategory;
-        const idx = parseInt(card.dataset.promptIdx);
-        const p = PROMPT_LIBRARY[cat][idx];
-        if (!p) return;
-        usePrompt(p);
-        showToast(`Prompt "${p.title}" aplicado!`, 'success');
-      });
     }
 
     // ─── IMAGE STYLES ──────────────────────────────────────────
