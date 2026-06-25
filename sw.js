@@ -1,10 +1,10 @@
-const CACHE = 'postafit-v1';
+const CACHE = 'postafit-v2';
 const ASSETS = [
-  '/postafit/',
-  '/postafit/index.html',
-  '/postafit/manifest.json',
-  '/postafit/logo.png',
-  '/postafit/logo-192.png'
+  './',
+  './index.html',
+  './manifest.json',
+  './logo.png',
+  './logo-192.png'
 ];
 
 self.addEventListener('install', (e) => {
